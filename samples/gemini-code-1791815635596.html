@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<title>রূপসী বাংলা – ৩০ সেকেন্ডের দৃশ্যকাব্য</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Hind_Siliguri:wght@400;600;700&family=Tiro_Bangla&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box}
+*,*:before,*:after{box-sizing:inherit}
+html,body{height:100%;margin:0;background:#060d09;color:#fff;font-family:'Hind_Siliguri','Tiro Bangla',sans-serif}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;overflow:hidden}
+#wrap{position:relative;overflow:hidden;border-radius:10px;box-shadow:0 25px 60px rgba(0,0,0,0.8)}
+#stage{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;background:#000;overflow:hidden}
+section{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+section>svg{position:absolute;inset:0;width:100%;height:100%}
+.c{position:absolute;display:flex;flex-direction:column;z-index:10}
+.tiro{font-family:'Tiro Bangla',serif}
+.title-big{font-size:105px;font-weight:700;line-height:1.1;margin:0;text-shadow:0 8px 30px rgba(0,0,0,0.5)}
+.title-sub{font-size:38px;font-weight:400;margin:10px 0 0;opacity:0.95}
+.badge{display:inline-block;padding:6px 20px;border-radius:30px;background:rgba(255,255,255,0.18);backdrop-filter:blur(6px);font-size:22px;letter-spacing:2px;font-weight:600;margin-bottom:12px;width:max-content}
+.card{position:absolute;top:280px;width:340px;height:310px;border-radius:24px;background:rgba(255,255,255,0.95);color:#1c2d27;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 25px 50px rgba(0,0,0,0.4);border:2px solid rgba(255,255,255,0.8)}
+.card i{font-style:normal;font-size:100px;line-height:1}
+.card b{font-size:30px;margin-top:14px;color:#0e382c}
+.card span{font-size:20px;color:#b33939;font-weight:600;margin-top:4px}
+#ctl{display:flex;align-items:center;gap:14px;width:min(94vw,960px);font-size:15px;background:#101a14;padding:10px 20px;border-radius:40px;border:1px solid #1f3327}
+#ctl button{background:#00875a;color:#fff;border:0;border-radius:20px;padding:8px 22px;font-size:15px;font-weight:600;cursor:pointer;transition:0.2s}
+#ctl button:hover{background:#02a871}
+#ctl input[type=range]{flex:1;accent-color:#02a871;cursor:pointer}
+#tl{font-variant-numeric:tabular-nums;color:#9bc4af;font-weight:600}
+</style>
+</head>
+<body>
+
+<div id="wrap">
+  <div id="stage">
+
+    <!-- দৃশ্য ১: ০-৫ সেকেন্ড (ভোর ও নদীমাতৃক রূপ) -->
+    <section>
+      <svg viewBox="0 0 1280 720">
+        <defs>
+          <linearGradient id="sky0" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ff6b4a"/>
+            <stop offset="60%" stop-color="#fec163"/>
+            <stop offset="100%" stop-color="#70a37f"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#sky0)"/>
+        <!-- প্রভাতী সূর্য -->
+        <circle id="dawnSun" cx="640" cy="520" r="110" fill="#fff3c4" opacity="0.95"/>
+        <!-- নদী ও ঢেউ -->
+        <g id="river0"></g>
+        <!-- পালতোলা নৌকা -->
+        <g id="boat0" transform="translate(480, 480)">
+          <path d="M0,35 Q60,50 140,35 Q120,65 20,65 Z" fill="#2b1a10"/>
+          <line x1="70" y1="35" x2="70" y2="-50" stroke="#1a0f0a" stroke-width="4"/>
+          <path d="M72,-45 Q120,-10 72,25 Z" fill="#fdfbf7"/>
+          <path d="M68,-40 Q25,-5 68,28 Z" fill="#df5334"/>
+        </g>
+      </svg>
+      <div class="c" style="left:0;right:0;top:130px;align-items:center;text-align:center">
+        <span class="badge" data-s="0.2" data-d="0.8">সোনার বাংলা</span>
+        <h1 class="title-big tiro" data-s="0.6" data-d="0.9" style="font-size:130px">রূপসী বাংলা</h1>
+        <p class="title-sub" data-s="1.2" data-d="0.8">তেরোশত নদীর পলিমাটির সুবাস</p>
+      </div>
+    </section>
+
+    <!-- দৃশ্য ২: ৫-১০ সেকেন্ড (আষাঢ়ের মেঘ ও বৃষ্টি) -->
+    <section>
+      <svg viewBox="0 0 1280 720">
+        <defs>
+          <linearGradient id="sky1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#192838"/>
+            <stop offset="70%" stop-color="#344e68"/>
+            <stop offset="100%" stop-color="#14261f"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#sky1)"/>
+        <g id="clouds"></g>
+        <g id="rain"></g>
+        <path d="M0,600 Q300,550 640,590 T1280,580 L1280,720 L0,720 Z" fill="#0b2416"/>
+        <path d="M0,640 Q400,610 800,650 T1280,630 L1280,720 L0,720 Z" fill="#071a10"/>
+      </svg>
+      <div class="c" style="left:100px;top:120px">
+        <span class="badge" data-s="0.4" data-d="0.7">বর্ষার আবাহন</span>
+        <h2 class="title-big tiro" data-s="0.8" data-d="0.8">মেঘমল্লার ও বৃষ্টি</h2>
+        <p class="title-sub" data-s="1.4" data-d="0.8">কদমের সুবাস আর সজল শ্যামল প্রকৃতি</p>
+      </div>
+    </section>
+
+    <!-- দৃশ্য ৩: ১০-১৫ সেকেন্ড (শরতের কাশফুল ও শান্ত নীলাকাশ) -->
+    <section>
+      <svg viewBox="0 0 1280 720">
+        <defs>
+          <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4ea8de"/>
+            <stop offset="70%" stop-color="#90e0ef"/>
+            <stop offset="100%" stop-color="#caf0f8"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#sky2)"/>
+        <!-- শান্ত মেঘ -->
+        <ellipse cx="250" cy="180" rx="140" ry="40" fill="#ffffff" opacity="0.85"/>
+        <ellipse cx="980" cy="140" rx="180" ry="50" fill="#ffffff" opacity="0.8"/>
+        <!-- কাশফুল বন -->
+        <g id="kashful"></g>
+      </svg>
+      <div class="c" style="left:100px;top:110px;color:#0b3c49">
+        <span class="badge" data-s="0.4" data-d="0.7" style="background:rgba(11,60,73,0.12)">শুভ্র শরৎ</span>
+        <h2 class="title-big tiro" data-s="0.8" data-d="0.8">কাশবনের মেলা</h2>
+        <p class="title-sub" data-s="1.4" data-d="0.8">নীল আকাশে সাদা তুলোর মতো ভেসে চলা মেঘ</p>
+      </div>
+    </section>
+
+    <!-- দৃশ্য ৪: ১৫-২০ সেকেন্ড (সুর, মাটি ও প্রাণের বাউল) -->
+    <section>
+      <svg viewBox="0 0 1280 720">
+        <defs>
+          <linearGradient id="sky3" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#4a154b"/>
+            <stop offset="50%" stop-color="#bc3908"/>
+            <stop offset="100%" stop-color="#f6aa1c"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#sky3)"/>
+        <circle cx="640" cy="360" r="320" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+        <circle cx="640" cy="360" r="230" fill="none" stroke="rgba(255,255,255,0.2)" stroke-dasharray="8 12" stroke-width="3"/>
+        <!-- একতারা ভেক্টর -->
+        <g id="ektara" transform="translate(640, 390)">
+          <path d="M-40,80 C-40,150 40,150 40,80 C40,40 -40,40 -40,80 Z" fill="#381b0d"/>
+          <line x1="-30" y1="70" x2="-5" y2="-170" stroke="#d4a373" stroke-width="8"/>
+          <line x1="30" y1="70" x2="5" y2="-170" stroke="#d4a373" stroke-width="8"/>
+          <circle cx="0" cy="-170" r="16" fill="#ba181b"/>
+          <line x1="0" y1="90" x2="0" y2="-160" stroke="#fff" stroke-width="2.5"/>
+        </g>
+      </svg>
+      <div class="c" style="left:0;right:0;top:80px;align-items:center;text-align:center">
+        <span class="badge" data-s="0.3" data-d="0.7">প্রাণের সুর</span>
+        <h2 class="title-big tiro" data-s="0.7" data-d="0.8">মাটির গান ও বাউল</h2>
+        <p class="title-sub" data-s="1.2" data-d="0.8">একতারার সুর আর রাখালিয়া বাঁশির টান</p>
+      </div>
+    </section>
+
+    <!-- দৃশ্য ৫: ২০-২৫ সেকেন্ড (চিরায়ত ঐতিহ্য ও সংস্কৃতি) -->
+    <section>
+      <svg viewBox="0 0 1280 720">
+        <defs>
+          <linearGradient id="sky4" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#03251c"/>
+            <stop offset="100%" stop-color="#0d523e"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#sky4)"/>
+      </svg>
+      <div class="c" style="left:0;right:0;top:80px;align-items:center;text-align:center">
+        <h2 class="title-big tiro" data-s="0.2" data-d="0.8" style="font-size:75px">আমাদের ঐতিহ্য ও সংস্কৃতি</h2>
+      </div>
+      <div class="card" style="left:95px" data-s="0.7" data-d="0.7" data-y="70">
+        <i>🌾</i>
+        <b>নবান্ন উৎসব</b>
+        <span>নতুন ধানের পিঠা-পুলি</span>
+      </div>
+      <div class="card" style="left:470px" data-s="1.3" data-d="0.7" data-y="70">
+        <i>🎨</i>
+        <b>আলপনা শিল্প</b>
+        <span>রঙে রাঙানো উঠোন</span>
+      </div>
+      <div class="card" style="left:845px" data-s="1.9" data-d="0.7" data-y="70">
+        <i>☕</i>
+        <b>টঙের আড্ডা</b>
+        <span>চা ও কথামালার উৎসব</span>
+      </div>
+    </section>
+
+    <!-- দৃশ্য ৬: ২৫-৩০ সেকেন্ড (সমাপ্তি বার্তা) -->
+    <section>
+      <svg viewBox="0 0 1280 720">
+        <defs>
+          <radialGradient id="endG">
+            <stop offset="0%" stop-color="#02734a"/>
+            <stop offset="100%" stop-color="#012b1c"/>
+          </radialGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#endG)"/>
+        <!-- রক্তিম সূর্য গোলক -->
+        <circle id="finalSun" cx="640" cy="360" r="210" fill="#e63946"/>
+      </svg>
+      <div class="c" style="left:0;right:0;top:120px;align-items:center;text-align:center">
+        <div data-s="0.3" data-d="0.9">
+          <svg width="220" height="132" viewBox="0 0 300 180">
+            <rect width="300" height="180" fill="#006a4e" rx="8" stroke="#ffffff" stroke-width="4"/>
+            <circle cx="135" cy="90" r="60" fill="#f42a41"/>
+          </svg>
+        </div>
+        <h2 class="title-big tiro" data-s="0.9" data-d="0.9" style="font-size:92px;margin-top:24px">আমার সোনার বাংলা</h2>
+        <p class="title-sub" data-s="1.6" data-d="0.9" style="font-size:38px;color:#ffea79">চিরদিন তোমার আকাশ, তোমার বাতাস</p>
+        <span class="badge" data-s="2.3" data-d="0.9" style="margin-top:22px;background:#ffffff;color:#03422e;font-size:24px;font-weight:700">ভালোবাসি বাংলাদেশ</span>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- কন্ট্রোল বার -->
+<div id="ctl">
+  <button id="pb">বিরতি</button>
+  <input id="rg" type="range" min="0" max="30000" value="0">
+  <span id="tl">০.০ / ৩০ সে.</span>
+</div>
+
+<script>
+const D = 30000; // ৩০ সেকেন্ড
+const SC = [[0,5], [5,10], [10,15], [15,20], [20,25], [25,30]];
+const $ = s => document.querySelector(s);
+const clamp = (v, min=0, max=1) => Math.min(max, Math.max(min, v));
+const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
+
+const secs = [...document.querySelectorAll('section')];
+
+// ১. নদী ও ঢেউ তৈরি
+const wavePath = 'M0,35 Q100,-25 200,35 T400,35 T600,35 T800,35 T1000,35 T1200,35 T1400,35 T1600,35 V300 H0z';
+const createWave = (y, color, speed) => `<g class="wv" data-speed="${speed}"><path d="${wavePath}" transform="translate(0,${y})" fill="${color}"/></g>`;
+$('#river0').innerHTML = createWave(490, '#438069', 35) + createWave(550, '#265947', -45) + createWave(620, '#123d2e', 60);
+
+// ২. বৃষ্টির ফোঁটা ও মেঘ তৈরি
+let rainSvg = '';
+for(let i=0; i<110; i++){
+  const rx = Math.random()*1280;
+  const ry = Math.random()*720;
+  rainSvg += `<line x1="${rx}" y1="${ry}" x2="${rx-8}" y2="${ry+35}" stroke="#90b4ce" stroke-width="2" opacity="${0.3+Math.random()*0.5}" class="drop" data-rx="${rx}" data-ry="${ry}"/>`;
+}
+$('#rain').innerHTML = rainSvg;
+
+let cloudSvg = '';
+for(let x=60; x<1300; x+=240){
+  cloudSvg += `<ellipse cx="${x}" cy="${130+Math.sin(x)*25}" rx="${160+Math.cos(x)*30}" ry="70" fill="#203345" opacity="0.85"/>`;
+}
+$('#clouds').innerHTML = cloudSvg;
+
+// ৩. কাশফুল জঙ্গল তৈরি
+let kashSvg = '';
+for(let x=-40; x<1340; x+=26){
+  const h = 260 + Math.sin(x*0.05)*60 + (x%5)*15;
+  kashSvg += `
+    <path class="kash-stem" data-base="${x}" d="M${x},720 Q${x+20},${720-h/2} ${x+35},${720-h}" stroke="#40705a" stroke-width="3" fill="none"/>
+    <ellipse class="kash-head" data-base="${x}" cx="${x+35}" cy="${720-h}" rx="22" ry="7" fill="#ffffff" opacity="0.9" transform="rotate(-30, ${x+35}, ${720-h})"/>
+  `;
+}
+$('#kashful').innerHTML = kashSvg;
+
+// বাংলা সংখ্যা কনভার্টার
+const toBanglaNum = n => ('' + n).replace(/\d/g, d => "০১২৩৪৫৬৭৮৯"[d]);
+
+// সিক ফ্রেম রেন্ডারিং ফাংশন
+function seek(ms){
+  ms = clamp(ms, 0, D - 1);
+  const t = ms / 1000;
+
+  // দৃশ্য ও ট্রানজিশন ম্যানেজমেন্ট
+  secs.forEach((sec, idx) => {
+    const [start, end] = SC[idx];
+    const localT = t - start;
+    const opacity = Math.min(idx === 0 ? 1 : clamp(localT / 0.6), idx === 5 ? 1 : clamp((end - t) / 0.6));
+    
+    sec.style.opacity = opacity;
+    sec.style.visibility = opacity > 0 ? 'visible' : 'hidden';
+
+    // টেক্সট ও কার্ড অ্যানিমেশন
+    sec.querySelectorAll('[data-s]').forEach(el => {
+      const delay = parseFloat(el.dataset.s);
+      const dur = parseFloat(el.dataset.d) || 0.8;
+      const progress = easeOutCubic(clamp((localT - delay) / dur));
+      el.style.opacity = progress;
+      el.style.transform = `translateY(${(1 - progress) * (parseFloat(el.dataset.y) || 35)}px)`;
+    });
+  });
+
+  // দৃশ্য ১: সূর্যোদয় এবং নৌকা দোলা
+  $('#dawnSun').setAttribute('cy', 530 - easeOutCubic(clamp(t / 4.5)) * 260);
+  $('#boat0').setAttribute('transform', `translate(${440 + t*16}, ${480 + Math.sin(t*3)*7}) rotate(${Math.sin(t*2.5)*4} 70 35)`);
+  document.querySelectorAll('.wv').forEach(w => {
+    const shift = ((t * parseFloat(w.dataset.speed)) % 400 + 400) % 400;
+    w.setAttribute('transform', `translate(${-shift},0)`);
+  });
+
+  // দৃশ্য ২: বৃষ্টির গতি
+  document.querySelectorAll('.drop').forEach((d, i) => {
+    const speed = 700 + (i % 5) * 120;
+    const curY = (parseFloat(d.dataset.ry) + t * speed) % 720;
+    const curX = parseFloat(d.dataset.rx) - (curY / 720) * 80;
+    d.setAttribute('x1', curX);
+    d.setAttribute('y1', curY);
+    d.setAttribute('x2', curX - 10);
+    d.setAttribute('y2', curY + 36);
+  });
+
+  // দৃশ্য ৩: বাতাসে দোলা কাশফুল
+  document.querySelectorAll('.kash-stem').forEach(stem => {
+    const bx = parseFloat(stem.dataset.base);
+    const sway = Math.sin(t * 3.5 + bx * 0.05) * 35;
+    const h = 260 + Math.sin(bx * 0.05) * 60 + (bx % 5) * 15;
+    stem.setAttribute('d', `M${bx},720 Q${bx + 15 + sway * 0.4},${720 - h / 2} ${bx + 30 + sway},${720 - h}`);
+  });
+  document.querySelectorAll('.kash-head').forEach(head => {
+    const bx = parseFloat(head.dataset.base);
+    const sway = Math.sin(t * 3.5 + bx * 0.05) * 35;
+    const h = 260 + Math.sin(bx * 0.05) * 60 + (bx % 5) * 15;
+    head.setAttribute('cx', bx + 30 + sway);
+    head.setAttribute('cy', 720 - h);
+    head.setAttribute('transform', `rotate(${-30 + sway * 0.8}, ${bx + 30 + sway}, ${720 - h})`);
+  });
+
+  // দৃশ্য ৪: একতারার ছন্দময় ঘূর্ণন ও কম্পন
+  const ektaraSway = Math.sin(t * 5) * 12;
+  $('#ektara').setAttribute('transform', `translate(640, 420) rotate(${ektaraSway}) scale(${1 + Math.sin(t * 10) * 0.03})`);
+
+  // দৃশ্য ৬: শেষ সূর্যের স্কেল
+  if (t >= 24) {
+    const p = easeOutCubic(clamp((t - 24) / 4));
+    $('#finalSun').setAttribute('r', 160 + p * 60);
+  }
+
+  // কন্ট্রোল ইনপুট আপডেট
+  $('#rg').value = ms;
+  $('#tl').textContent = toBanglaNum(t.toFixed(1)) + ' / ৩০ সে.';
+}
+
+// রেসপনসিভ ফিট স্ক্রিন
+const wrap = $('#wrap'), stage = $('#stage');
+function fitScreen(){
+  const scale = Math.min(window.innerWidth / 1280, (window.innerHeight - 80) / 720);
+  wrap.style.width = (1280 * scale) + 'px';
+  wrap.style.height = (720 * scale) + 'px';
+  stage.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitScreen);
+fitScreen();
+
+// প্লেব্যাক লুপ
+let isPlaying = true, startTime = 0, baseTime = 0;
+function animLoop(now){
+  if(isPlaying){
+    const ms = baseTime + (now - startTime);
+    if(ms >= D){
+      baseTime = 0;
+      startTime = now;
+      seek(0);
+    } else {
+      seek(ms);
+    }
+  }
+  requestAnimationFrame(animLoop);
+}
+
+function play(){
+  baseTime = +$('#rg').value;
+  startTime = performance.now();
+  isPlaying = true;
+  $('#pb').textContent = 'বিরতি';
+}
+
+function pause(){
+  isPlaying = false;
+  $('#pb').textContent = 'চালান';
+}
+
+$('#pb').onclick = () => isPlaying ? pause() : play();
+$('#rg').oninput = e => {
+  seek(+e.target.value);
+  if(isPlaying) play();
+};
+
+seek(0);
+requestAnimationFrame(ts => {
+  startTime = ts;
+  animLoop(ts);
+});
+</script>
+</body>
+</html>

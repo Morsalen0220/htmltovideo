@@ -1,0 +1,53 @@
+.timeline {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #111122;
+  overflow: hidden;
+}
+
+.timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--bg-panel-header);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  height: 36px;
+}
+
+.time-display {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--accent-light);
+  min-width: 60px;
+}
+
+.canvas-scroll-container {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-canvas {
+  flex: none;
+  display: block;
+  cursor: default;
+  max-height: none;
+}
+
+.timeline-scrollbar {
+  height: 16px;
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.timeline-scrollbar input[type="range"] {
+  width: 100%;
+}

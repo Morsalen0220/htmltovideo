@@ -1,0 +1,77 @@
+{
+  "name": "h2video-h2vid",
+  "version": "1.0.0",
+  "description": "Convert seek-based HTML animations to MP4 video",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development vite",
+    "dev:electron": "wait-on tcp:5173 && tsc -p tsconfig.electron.json && cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "build": "vite build",
+    "start": "cross-env NODE_ENV=production electron .",
+    "typecheck": "tsc --noEmit",
+    "package": "npm run build && electron-builder"
+  },
+  "keywords": [
+    "electron",
+    "html",
+    "video",
+    "animation"
+  ],
+  "author": "h2video H2VID",
+  "license": "MIT",
+  "dependencies": {
+    "acorn": "^8.11.3",
+    "acorn-walk": "^8.3.2",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "immer": "^10.0.4",
+    "puppeteer-core": "^21.9.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "wavesurfer.js": "^7.6.4",
+    "zundo": "^2.2.0",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/fluent-ffmpeg": "^2.1.24",
+    "@types/node": "^20.11.30",
+    "@types/react": "^18.2.67",
+    "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^29.1.5",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.4.2",
+    "vite": "^5.2.2",
+    "vite-plugin-electron": "^0.28.6",
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.html2video.studio",
+    "productName": "h2video H2VID",
+    "directories": {
+      "output": "dist-build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "samples",
+        "to": "samples"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
