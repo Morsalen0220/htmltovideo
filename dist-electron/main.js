@@ -5,8 +5,6 @@ const fs = require("fs");
 const os = require("os");
 electron.app.setName("h2video H2VID");
 electron.app.disableHardwareAcceleration();
-electron.app.commandLine.appendSwitch("no-sandbox");
-electron.app.commandLine.appendSwitch("disable-gpu-sandbox");
 electron.protocol.registerSchemesAsPrivileged([
   {
     scheme: "preview",
@@ -35,7 +33,7 @@ function createWindow() {
       contextIsolation: true,
       webviewTag: true,
       // Allow webview for HTML preview
-      sandbox: false
+      sandbox: true
     },
     frame: true,
     show: false,

@@ -750,23 +750,31 @@ export const FX_RUNTIME = String.raw`
   };
   window.__h2v_seek = function (ms, cmds) {
     window.__h2v_time = ms;
-    if (typeof window.seek === 'function') window.seek(ms);
-    try {
-      if (document.getAnimations) {
-        var anims = document.getAnimations();
-        for (var a = 0; a < anims.length; a++) anims[a].currentTime = ms;
-      }
-    } catch (e) {}
+    // A page-provided seek controller may use scene-local animation times or
+    // otherwise manage its own CSS animations. Don't overwrite those times with
+    // the global project time after calling it.
+    var hasPageSeek = typeof window.seek === 'function';
+    if (hasPageSeek) window.seek(ms);
+    else {
+      try {
+        if (document.getAnimations) {
+          var anims = document.getAnimations();
+          for (var a = 0; a < anims.length; a++) anims[a].currentTime = ms;
+        }
+      } catch (e) {}
+    }
     if (cmds) {
       var made = window.__h2v_apply(cmds);
       if (made) {
-        if (typeof window.seek === 'function') window.seek(ms);
-        try {
-          if (document.getAnimations) {
-            var anims2 = document.getAnimations();
-            for (var a2 = 0; a2 < anims2.length; a2++) anims2[a2].currentTime = ms;
-          }
-        } catch (e) {}
+        if (hasPageSeek) window.seek(ms);
+        else {
+          try {
+            if (document.getAnimations) {
+              var anims2 = document.getAnimations();
+              for (var a2 = 0; a2 < anims2.length; a2++) anims2[a2].currentTime = ms;
+            }
+          } catch (e) {}
+        }
         window.__h2v_apply(cmds);
       }
     }

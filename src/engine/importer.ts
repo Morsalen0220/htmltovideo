@@ -156,6 +156,11 @@ export function parseHtmlSource(html: string): ParsedHtml {
   if (!hasSeekController) {
     warnings.push('No seek(ms) animation function was detected. The imported page may not respond correctly to preview seeking or export.');
   }
+  const hasCssAnimations = /@keyframes\b|\banimation(?:-name|-duration)?\s*:/i.test(html);
+  const pageControlsAnimationTime = /\.getAnimations\s*\(|\.currentTime\s*=/.test(html);
+  if (hasSeekController && hasCssAnimations && pageControlsAnimationTime) {
+    warnings.push('The page seek() controller manages CSS animation timing. H2VID preserves its scene-relative animation times; check animation delays against each scene duration if motion still appears missing.');
+  }
 
   // -------------------------------------------------------
   // 3. Extract items (elements with data-s)

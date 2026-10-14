@@ -28,7 +28,7 @@ const AudioTab: React.FC<AudioTabProps> = ({ selectedClip, onSelectClip }) => {
     if (!window.electronAPI) return;
     const result = await window.electronAPI.showOpenDialog({
       title: 'Import Audio to Bin',
-      filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac'] }],
+      filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'flac', 'aiff', 'aif'] }],
       properties: ['openFile', 'multiSelections']
     });
     if (result.canceled) return;

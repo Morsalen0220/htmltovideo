@@ -9,6 +9,7 @@
 
 import puppeteer, { Browser, Page } from 'puppeteer-core';
 import { ChildProcess, spawn } from 'child_process';
+import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -19,7 +20,29 @@ import type { ProjectData } from '../src/types/project';
 
 // ffmpeg-static gives us the path to a bundled FFmpeg binary
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const ffmpegPath: string = require('ffmpeg-static');
+const ffmpegPathFromPackage: string = require('ffmpeg-static');
+
+function getFfmpegExecutablePath(): string {
+  if (!ffmpegPathFromPackage) return '';
+  if (!app.isPackaged) return ffmpegPathFromPackage;
+
+  // child_process.spawn cannot execute a binary through Electron's virtual ASAR path.
+  // electron-builder places this executable in app.asar.unpacked; point directly there.
+  const unpackedPath = path.join(
+    path.dirname(app.getAppPath()),
+    'app.asar.unpacked',
+    'node_modules',
+    'ffmpeg-static',
+    path.basename(ffmpegPathFromPackage)
+  );
+  if (fs.existsSync(unpackedPath)) return unpackedPath;
+
+  // Fallback for customized package layouts that preserve the module's relative path.
+  const asarPath = `${path.sep}app.asar${path.sep}`;
+  return ffmpegPathFromPackage.includes(asarPath)
+    ? ffmpegPathFromPackage.replace(asarPath, `${path.sep}app.asar.unpacked${path.sep}`)
+    : ffmpegPathFromPackage;
+}
 
 /** Find a locally installed Chromium browser. puppeteer-core does not download one. */
 function findChromiumExecutable(): string {
@@ -81,6 +104,7 @@ export interface RenderConfig {
 export interface AudioClipForRender {
   file: string;
   start: number;   // ms – delay in video
+  duration?: number; // ms – source duration when known
   trimIn: number;  // ms
   trimOut: number; // ms
   volume: number;  // 0–1
@@ -251,7 +275,8 @@ async function runRender(
     // Find the bundled Chromium path
     const chromiumPath = findChromiumExecutable();
 
-    if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+    const ffmpegExecutablePath = getFfmpegExecutablePath();
+    if (!ffmpegExecutablePath || !fs.existsSync(ffmpegExecutablePath)) {
       throw new Error('The bundled FFmpeg executable is missing. Reinstall the app dependencies and try again.');
     }
 
@@ -259,8 +284,6 @@ async function runRender(
       executablePath: chromiumPath,
       headless: true,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
         `--window-size=${stageW},${stageH}`,
@@ -316,7 +339,7 @@ async function runRender(
 
     // ── 5. Capture frames and pipe to FFmpeg ──────────────────────────────
     const ffmpegArgs = buildFfmpegArgs(config, tempDir, audioFiles, totalFrames);
-    const ffmpegProc = spawn(ffmpegPath, ffmpegArgs, {
+    const ffmpegProc = spawn(ffmpegExecutablePath, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -326,6 +349,9 @@ async function runRender(
     });
 
     const ffmpegDone = new Promise<void>((resolve, reject) => {
+      ffmpegProc.on('error', (error: Error) => {
+        reject(new Error(`Could not start the bundled FFmpeg executable: ${error.message}`));
+      });
       ffmpegProc.on('close', (code: number) => {
         if (code === 0) resolve();
         else reject(new Error(`FFmpeg exited with code ${code}\n${ffmpegStderr.slice(-2000)}`));
@@ -478,13 +504,31 @@ function buildFfmpegArgs(
       const fadeInSec = clip.fadeIn / 1000;
       const fadeOutSec = clip.fadeOut / 1000;
       const vol = clip.volume;
+      const trimInSec = Math.max(0, clip.trimIn / 1000);
+      const trimOutSec = Math.max(0, clip.trimOut / 1000);
+      const knownClipDurationSec = clip.duration === undefined
+        ? undefined
+        : Math.max(0, clip.duration / 1000 - trimInSec - trimOutSec);
+      const effectiveFadeIn = knownClipDurationSec === undefined
+        ? Math.max(0, fadeInSec)
+        : Math.min(Math.max(0, fadeInSec), knownClipDurationSec);
+      const effectiveFadeOut = knownClipDurationSec === undefined
+        ? Math.max(0, fadeOutSec)
+        : Math.min(Math.max(0, fadeOutSec), knownClipDurationSec);
 
-      let chain = `[${inputIdx}:a]`;
-      if (clip.trimIn > 0) chain += `atrim=start=${clip.trimIn / 1000},asetpts=PTS-STARTPTS,`;
-      if (fadeInSec > 0) chain += `afade=t=in:d=${fadeInSec},`;
-      chain += `volume=${vol}`;
+      // Trim both ends before applying fades. Reverse + atrim trims from the source tail
+      // without needing a separate ffprobe duration lookup. Reset timestamps around the
+      // reverse filters so fades are relative to this clip, then place it on the timeline.
+      let chain = `[${inputIdx}:a]atrim=start=${trimInSec},asetpts=PTS-STARTPTS`;
+      if (trimOutSec > 0) {
+        chain += `,areverse,asetpts=PTS-STARTPTS,atrim=start=${trimOutSec},asetpts=PTS-STARTPTS,areverse,asetpts=PTS-STARTPTS`;
+      }
+      if (effectiveFadeIn > 0) chain += `,afade=t=in:d=${effectiveFadeIn}`;
+      if (effectiveFadeOut > 0) {
+        chain += `,areverse,asetpts=PTS-STARTPTS,afade=t=in:d=${effectiveFadeOut},areverse,asetpts=PTS-STARTPTS`;
+      }
+      chain += `,volume=${vol}`;
       if (delay > 0) chain += `,adelay=${delay}|${delay}`;
-      if (fadeOutSec > 0) chain += `,afade=t=out:st=${Math.max(0, (config.projectData.source?.duration || 30000) / 1000 - fadeOutSec)}:d=${fadeOutSec}`;
       chain += `[a${idx}]`;
 
       filterParts.push(chain);
@@ -492,7 +536,7 @@ function buildFfmpegArgs(
     });
 
     if (validAudio.length > 1) {
-      filterParts.push(`${mixInputs}amix=inputs=${validAudio.length}:duration=first[aout]`);
+      filterParts.push(`${mixInputs}amix=inputs=${validAudio.length}:duration=longest[aout]`);
       args.push('-filter_complex', filterParts.join(';'));
       args.push('-map', '0:v', '-map', '[aout]');
     } else {

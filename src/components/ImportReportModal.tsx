@@ -23,6 +23,10 @@ function getIssueHelp(message: string) {
     impact: 'Scene timing may be estimated equally, so cuts can land at the wrong points.',
     fix: 'Define SC as numeric [start,end] pairs in seconds, in the same order as the <section> elements. Example: const SC=[[0,5],[5,10],[10,15]].'
   };
+  if (lower.includes('seek() controller manages css animation timing')) return {
+    impact: 'The HTML controls CSS animation times inside its own seek() function. H2VID preserves that timing so scene-local animations are not overwritten by global project time.',
+    fix: 'No change is needed for H2VID. If a motion still does not appear, check that its animation-delay and duration fit within the matching SC scene interval.'
+  };
   if (lower.includes('after the detected total duration')) return {
     impact: 'The last scene extends beyond the project duration and may be cut off.',
     fix: 'Set D in milliseconds to at least the final SC end in seconds multiplied by 1000, or shorten the final scene.'

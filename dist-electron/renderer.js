@@ -2,6 +2,7 @@
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 const puppeteer = require("puppeteer-core");
 const child_process = require("child_process");
+const electron = require("electron");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -746,23 +747,31 @@ const FX_RUNTIME = String.raw`
   };
   window.__h2v_seek = function (ms, cmds) {
     window.__h2v_time = ms;
-    if (typeof window.seek === 'function') window.seek(ms);
-    try {
-      if (document.getAnimations) {
-        var anims = document.getAnimations();
-        for (var a = 0; a < anims.length; a++) anims[a].currentTime = ms;
-      }
-    } catch (e) {}
+    // A page-provided seek controller may use scene-local animation times or
+    // otherwise manage its own CSS animations. Don't overwrite those times with
+    // the global project time after calling it.
+    var hasPageSeek = typeof window.seek === 'function';
+    if (hasPageSeek) window.seek(ms);
+    else {
+      try {
+        if (document.getAnimations) {
+          var anims = document.getAnimations();
+          for (var a = 0; a < anims.length; a++) anims[a].currentTime = ms;
+        }
+      } catch (e) {}
+    }
     if (cmds) {
       var made = window.__h2v_apply(cmds);
       if (made) {
-        if (typeof window.seek === 'function') window.seek(ms);
-        try {
-          if (document.getAnimations) {
-            var anims2 = document.getAnimations();
-            for (var a2 = 0; a2 < anims2.length; a2++) anims2[a2].currentTime = ms;
-          }
-        } catch (e) {}
+        if (hasPageSeek) window.seek(ms);
+        else {
+          try {
+            if (document.getAnimations) {
+              var anims2 = document.getAnimations();
+              for (var a2 = 0; a2 < anims2.length; a2++) anims2[a2].currentTime = ms;
+            }
+          } catch (e) {}
+        }
         window.__h2v_apply(cmds);
       }
     }
@@ -952,7 +961,21 @@ function buildOverrideCommands(tMs, project) {
   }
   return commands;
 }
-const ffmpegPath = require("ffmpeg-static");
+const ffmpegPathFromPackage = require("ffmpeg-static");
+function getFfmpegExecutablePath() {
+  if (!ffmpegPathFromPackage) return "";
+  if (!electron.app.isPackaged) return ffmpegPathFromPackage;
+  const unpackedPath = path.join(
+    path.dirname(electron.app.getAppPath()),
+    "app.asar.unpacked",
+    "node_modules",
+    "ffmpeg-static",
+    path.basename(ffmpegPathFromPackage)
+  );
+  if (fs.existsSync(unpackedPath)) return unpackedPath;
+  const asarPath = `${path.sep}app.asar${path.sep}`;
+  return ffmpegPathFromPackage.includes(asarPath) ? ffmpegPathFromPackage.replace(asarPath, `${path.sep}app.asar.unpacked${path.sep}`) : ffmpegPathFromPackage;
+}
 function findChromiumExecutable() {
   const candidates = [process.env.PUPPETEER_EXECUTABLE_PATH];
   if (process.platform === "win32") {
@@ -1107,15 +1130,14 @@ async function runRender(config, onProgress, abort) {
     );
     fs.writeFileSync(htmlTempPath, injectedHtml, "utf-8");
     const chromiumPath = findChromiumExecutable();
-    if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+    const ffmpegExecutablePath = getFfmpegExecutablePath();
+    if (!ffmpegExecutablePath || !fs.existsSync(ffmpegExecutablePath)) {
       throw new Error("The bundled FFmpeg executable is missing. Reinstall the app dependencies and try again.");
     }
     browser = await puppeteer.launch({
       executablePath: chromiumPath,
       headless: true,
       args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
         `--window-size=${stageW},${stageH}`
@@ -1158,7 +1180,7 @@ async function runRender(config, onProgress, abort) {
     );
     await page.evaluate(() => self.__h2v_waitFonts());
     const ffmpegArgs = buildFfmpegArgs(config, tempDir, audioFiles, totalFrames);
-    const ffmpegProc = child_process.spawn(ffmpegPath, ffmpegArgs, {
+    const ffmpegProc = child_process.spawn(ffmpegExecutablePath, ffmpegArgs, {
       stdio: ["pipe", "pipe", "pipe"]
     });
     let ffmpegStderr = "";
@@ -1166,6 +1188,9 @@ async function runRender(config, onProgress, abort) {
       ffmpegStderr += d.toString();
     });
     const ffmpegDone = new Promise((resolve, reject) => {
+      ffmpegProc.on("error", (error) => {
+        reject(new Error(`Could not start the bundled FFmpeg executable: ${error.message}`));
+      });
       ffmpegProc.on("close", (code) => {
         if (code === 0) resolve();
         else reject(new Error(`FFmpeg exited with code ${code}
@@ -1272,24 +1297,32 @@ function buildFfmpegArgs(config, tempDir, audioFiles, totalFrames) {
     let filterParts = [];
     let mixInputs = "";
     validAudio.forEach((clip, idx) => {
-      var _a;
       const inputIdx = idx + 1;
       const delay = Math.round(clip.start);
       const fadeInSec = clip.fadeIn / 1e3;
       const fadeOutSec = clip.fadeOut / 1e3;
       const vol = clip.volume;
-      let chain = `[${inputIdx}:a]`;
-      if (clip.trimIn > 0) chain += `atrim=start=${clip.trimIn / 1e3},asetpts=PTS-STARTPTS,`;
-      if (fadeInSec > 0) chain += `afade=t=in:d=${fadeInSec},`;
-      chain += `volume=${vol}`;
+      const trimInSec = Math.max(0, clip.trimIn / 1e3);
+      const trimOutSec = Math.max(0, clip.trimOut / 1e3);
+      const knownClipDurationSec = clip.duration === void 0 ? void 0 : Math.max(0, clip.duration / 1e3 - trimInSec - trimOutSec);
+      const effectiveFadeIn = knownClipDurationSec === void 0 ? Math.max(0, fadeInSec) : Math.min(Math.max(0, fadeInSec), knownClipDurationSec);
+      const effectiveFadeOut = knownClipDurationSec === void 0 ? Math.max(0, fadeOutSec) : Math.min(Math.max(0, fadeOutSec), knownClipDurationSec);
+      let chain = `[${inputIdx}:a]atrim=start=${trimInSec},asetpts=PTS-STARTPTS`;
+      if (trimOutSec > 0) {
+        chain += `,areverse,asetpts=PTS-STARTPTS,atrim=start=${trimOutSec},asetpts=PTS-STARTPTS,areverse,asetpts=PTS-STARTPTS`;
+      }
+      if (effectiveFadeIn > 0) chain += `,afade=t=in:d=${effectiveFadeIn}`;
+      if (effectiveFadeOut > 0) {
+        chain += `,areverse,asetpts=PTS-STARTPTS,afade=t=in:d=${effectiveFadeOut},areverse,asetpts=PTS-STARTPTS`;
+      }
+      chain += `,volume=${vol}`;
       if (delay > 0) chain += `,adelay=${delay}|${delay}`;
-      if (fadeOutSec > 0) chain += `,afade=t=out:st=${Math.max(0, (((_a = config.projectData.source) == null ? void 0 : _a.duration) || 3e4) / 1e3 - fadeOutSec)}:d=${fadeOutSec}`;
       chain += `[a${idx}]`;
       filterParts.push(chain);
       mixInputs += `[a${idx}]`;
     });
     if (validAudio.length > 1) {
-      filterParts.push(`${mixInputs}amix=inputs=${validAudio.length}:duration=first[aout]`);
+      filterParts.push(`${mixInputs}amix=inputs=${validAudio.length}:duration=longest[aout]`);
       args.push("-filter_complex", filterParts.join(";"));
       args.push("-map", "0:v", "-map", "[aout]");
     } else {

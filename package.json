@@ -1,6 +1,6 @@
 {
   "name": "h2video-h2vid",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Convert seek-based HTML animations to MP4 video",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -54,6 +54,9 @@
     "directories": {
       "output": "dist-build"
     },
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**"
+    ],
     "files": [
       "dist/**/*",
       "dist-electron/**/*"

@@ -5,11 +5,8 @@ import os from 'os';
 
 app.setName('h2video H2VID');
 
-// Disable GPU sandbox for Puppeteer compatibility
-// Avoid black webview previews on systems where Chromium's GPU mailbox fails.
+// Disable GPU acceleration to avoid black webview previews on affected systems.
 app.disableHardwareAcceleration();
-app.commandLine.appendSwitch('no-sandbox');
-app.commandLine.appendSwitch('disable-gpu-sandbox');
 
 // ── Custom preview:// protocol ────────────────────────────────────────────────
 // Must be registered BEFORE app.whenReady()
@@ -45,7 +42,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webviewTag: true, // Allow webview for HTML preview
-      sandbox: false
+      sandbox: true
     },
     frame: true,
     show: false,

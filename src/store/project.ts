@@ -162,14 +162,18 @@ export const useProjectStore = create<AppState>()(
       isLoading: false,
       loadingMessage: '',
 
-      setProject: (project) => set((state) => {
-        if (!project.audioAssets) project.audioAssets = [];
-        state.project = project;
-        state.isModified = false;
-        state.currentTimeMs = 0;
-        state.isPlaying = false;
-        state.selection = { selectedSceneId: null, selectedItemIds: [], selectedAudioId: null, hoveredItemId: null };
-      }),
+      setProject: (project) => {
+        set((state) => {
+          if (!project.audioAssets) project.audioAssets = [];
+          state.project = project;
+          state.isModified = false;
+          state.currentTimeMs = 0;
+          state.isPlaying = false;
+          state.selection = { selectedSceneId: null, selectedItemIds: [], selectedAudioId: null, hoveredItemId: null };
+        });
+        // A newly opened/imported project must not be undoable back into the previous project.
+        useProjectStore.temporal.getState().clear();
+      },
 
       setProjectFilePath: (path) => set((state) => {
         state.projectFilePath = path;
@@ -504,15 +508,18 @@ export const useProjectStore = create<AppState>()(
         state.isModified = false;
       }),
 
-      resetProject: () => set((state) => {
-        state.project = createEmptyProject();
-        state.projectFilePath = null;
-        state.isModified = false;
-        state.selection = { selectedSceneId: null, selectedItemIds: [], selectedAudioId: null, hoveredItemId: null };
-        state.currentTimeMs = 0;
-        state.isPlaying = false;
-        state.importReport = null;
-      })
+      resetProject: () => {
+        set((state) => {
+          state.project = createEmptyProject();
+          state.projectFilePath = null;
+          state.isModified = false;
+          state.selection = { selectedSceneId: null, selectedItemIds: [], selectedAudioId: null, hoveredItemId: null };
+          state.currentTimeMs = 0;
+          state.isPlaying = false;
+          state.importReport = null;
+        });
+        useProjectStore.temporal.getState().clear();
+      }
     })),
     {
       // Only include project changes in undo history
