@@ -1,0 +1,65 @@
+H2VID-এর জন্য HTML অ্যানিমেশন বানানোর নিয়ম
+
+একটি সম্পূর্ণ .html animation বানাও। নিচের নিয়মগুলো মানো:
+
+1. Stage
+- নির্দিষ্ট মাপ দাও: #stage { width:1280px; height:720px; position:relative; overflow:hidden; }
+- সব লেখা ও artwork #stage-এর ভেতরে রাখো।
+
+2. Scene ও সময়
+- প্রতিটি দৃশ্য আলাদা <section>-এ রাখো।
+- D আলাদা লাইনে পূর্ণসংখ্যা মিলিসেকেন্ডে লেখো: const D = 20000;
+- SC আলাদা লাইনে সরল numeric pair হিসেবে লেখো: const SC = [[0,5],[5,10]];
+- D-তে `20*1000`-এর মতো হিসাব বা variable নয়; শুধু সংখ্যা লেখো।
+- SC-তে variable বা হিসাব নয়; শুধু numeric start/end pair লেখো।
+- SC-এর scene সংখ্যা ও <section> সংখ্যা সমান রাখো। প্রথম scene 0 থেকে শুরু করো;
+  gap/overlap রেখো না; শেষ সময় D/1000-এর সমান করো।
+
+3. Animation control — সবচেয়ে জরুরি
+- function seek(ms) বানাও। ms হলো animation-এর সময় মিলিসেকেন্ডে।
+- seek(ms) ওই সময়ের সম্পূর্ণ সঠিক frame দেখাবে; আগের frame চালিয়ে যাওয়ার ওপর
+  নির্ভর করবে না। একই ms দিলে একই frame আসতে হবে।
+- শেষে window.seek=seek; এবং seek(0); লিখো।
+- Canvas হলে seek(ms)-এ canvas পরিষ্কার করে ওই সময়ের পুরো frame আবার আঁকো।
+- শুধু স্বাভাবিক requestAnimationFrame বা চলমান CSS animation-এর ওপর নির্ভর কোরো না;
+  seek(ms) থেকে animation-এর সময়/অবস্থা নিয়ন্ত্রণ করো।
+- প্রতিটি frame-এ SVG attribute-এর মান valid রাখো: বিশেষ করে <circle r> কখনো 0-এর
+  কম হবে না। Radius হিসাব করলে Math.max(0, radius) দিয়ে clamp করো। NaN, Infinity,
+  negative width/height বা invalid color/coordinate SVG-তে বসিও না।
+
+4. Sound export
+- HTML-এ WAV download button রাখো, যার label-এ “WAV” বা “Export Audio” থাকবে।
+- ভালো integration-এর জন্য window.__H2VID_EXPORT_AUDIO__() দাও; এটি পুরো
+  animation-এর sound-সহ WAV Blob return করবে।
+- H2VID-এ source sound mute করা যাবে। Video-তে sound চাইলে exported WAV Audio Bin
+  থেকে timeline-এ বসাও; সেখান থেকে audio mute বা remove করা যাবে।
+
+5. Editable লেখা
+- H2VID-এ edit করার লেখা scene-এর ভেতরে <h1>, <h2>, <h3> বা <p>-এ রাখো।
+- সময় ও duration সেকেন্ডে দাও: <p data-s="1.2" data-d="2">লেখা</p>
+- Canvas-এ আঁকা লেখা editable text layer হবে না।
+
+6. ফাইল ও control
+- ছবি/font/script বাইরে থেকে নিলে সেগুলো সঙ্গে দাও বা HTML-এ embed করো।
+- HTML-এর নিজস্ব play/pause bar দরকার নেই।
+
+ন্যূনতম কাঠামো:
+
+<div id="stage">
+  <section><h1 data-s="0" data-d="5">প্রথম দৃশ্য</h1></section>
+  <section><p data-s="5" data-d="5">দ্বিতীয় দৃশ্য</p></section>
+</div>
+<script>
+const D = 10000;
+const SC = [[0,5],[5,10]];
+function seek(ms) {
+  const t=ms/1000;
+  // t অনুযায়ী সব লেখা, shape ও animation update করো
+}
+window.seek=seek;
+seek(0);
+</script>
+
+চূড়ান্ত যাচাই: D/SC সরল numeric format-এ আছে? section সংখ্যা মেলে? seek(ms)-এর
+সব frame-এ SVG মান valid থাকে? Browser console-এ error নেই? Editable লেখা HTML
+text tag-এ আছে? সব asset পাওয়া যাবে?

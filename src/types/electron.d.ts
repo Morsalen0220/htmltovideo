@@ -10,11 +10,13 @@ interface ElectronAPI {
   showSaveDialog: (opts: unknown) => Promise<{ canceled: boolean; filePath?: string }>;
   readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>;
   writeFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>;
+  shareProject: (project: unknown) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
   readFileBinary: (path: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   fileExists: (path: string) => Promise<boolean>;
   mkdir: (path: string) => Promise<{ success: boolean; error?: string }>;
   deleteDir: (path: string) => Promise<{ success: boolean; error?: string }>;
   listDir: (path: string) => Promise<{ success: boolean; files?: string[]; error?: string }>;
+  listAudioDownloads: () => Promise<Array<{ name: string; path: string }>>;
 
   // System info
   getCpuCount: () => Promise<number>;

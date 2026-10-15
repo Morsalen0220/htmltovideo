@@ -48,7 +48,7 @@ export interface ProjectDataForRender {
     start: number;
     trimIn: number;
     trimOut: number;
-    volume: number;
+    volume: number; // 0–3 (0–300%)
     fadeIn: number;
     fadeOut: number;
   }>;

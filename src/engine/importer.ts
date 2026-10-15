@@ -156,6 +156,14 @@ export function parseHtmlSource(html: string): ParsedHtml {
   if (!hasSeekController) {
     warnings.push('No seek(ms) animation function was detected. The imported page may not respond correctly to preview seeking or export.');
   }
+  const hasNativeMediaControls = /<(?:audio|video)\b[^>]*\bcontrols(?:\s|=|>)/i.test(html);
+  const hasCustomPlaybackBar = /<button\b/i.test(html)
+    && /<input\b[^>]*\btype\s*=\s*["']?range\b/i.test(html)
+    && (/(?:\bplay\b|\bpause\b|\bresume\b)/i.test(html)
+      || /\bid\s*=\s*["'](?:pb|play|pause|resume|player-controls?)["']/i.test(html));
+  if (hasNativeMediaControls || hasCustomPlaybackBar) {
+    warnings.push('Source playback controls were detected. H2VID hides the source play/pause/seek bar in preview and export; use H2VID playback controls instead.');
+  }
   const hasCssAnimations = /@keyframes\b|\banimation(?:-name|-duration)?\s*:/i.test(html);
   const pageControlsAnimationTime = /\.getAnimations\s*\(|\.currentTime\s*=/.test(html);
   if (hasSeekController && hasCssAnimations && pageControlsAnimationTime) {
@@ -167,7 +175,7 @@ export function parseHtmlSource(html: string): ParsedHtml {
   // -------------------------------------------------------
   const items: DetectedItem[] = extractItemsFromHtml(html, scenes);
   if (items.length === 0) {
-    warnings.push('No editable text or timed items were detected. The HTML can still preview, but the layer tree may be empty.');
+    warnings.push('No editable text/items found. Preview and render still work, but the Layers list will be empty.');
   }
   
   // -------------------------------------------------------
@@ -189,6 +197,12 @@ export function parseHtmlSource(html: string): ParsedHtml {
   
   if (hasOwnAudio) {
     warnings.push('This page contains its own audio (AudioContext or <audio>). It will be muted in preview and export. Import a music file instead.');
+  }
+
+  const hasRemoteAssets = /<(?:script|link|img|source|video|audio)\b[^>]*\b(?:src|href)\s*=\s*["']https?:\/\//i.test(html)
+    || /url\(\s*["']?https?:\/\//i.test(html);
+  if (hasRemoteAssets) {
+    warnings.push('External assets detected. Preview/render may need an internet connection; use local asset files for offline use.');
   }
   
   // Check for underscore font names

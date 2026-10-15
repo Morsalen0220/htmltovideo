@@ -107,7 +107,7 @@ export interface AudioClipForRender {
   duration?: number; // ms – source duration when known
   trimIn: number;  // ms
   trimOut: number; // ms
-  volume: number;  // 0–1
+  volume: number;  // 0–3 (0–300%)
   fadeIn: number;  // ms
   fadeOut: number; // ms
 }
@@ -196,7 +196,7 @@ const NEUTRALIZE_SCRIPT = `
 
 const CAPTURE_CSS = `
   body { margin: 0 !important; padding: 0 !important; overflow: hidden !important; }
-  #ctl, #controls { display: none !important; }
+  #ctl, #controls, .controls, [id*="control"], #bar:has(button):has(input[type="range"]) { display: none !important; }
   #wrap { position: fixed !important; top: 0 !important; left: 0 !important; margin: 0 !important; }
 `;
 

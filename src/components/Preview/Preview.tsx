@@ -23,11 +23,15 @@ type WebviewEl = HTMLElement & {
 const Preview: React.FC = () => {
   const webviewRef   = useRef<WebviewEl | null>(null);
   const rafRef       = useRef<number | null>(null);
+  const playbackGenerationRef = useRef(0);
   const pbRef        = useRef({ playing: false, startTime: 0, baseMs: 0 });
   const lastSeekRef  = useRef<number>(-1);
   const readyRef     = useRef(false);
   const readyHtmlRef = useRef<string | null>(null);
   const loadGenerationRef = useRef(0);
+  const seekInFlightRef = useRef(false);
+  const pendingSeekRef = useRef<{ webview: WebviewEl; code: string; generation: number; html: string } | null>(null);
+  const flushSeekRef = useRef<() => void>(() => {});
   const loadListenersRef = useRef<{ webview: WebviewEl; domReady: (...args: unknown[]) => void; finish: (...args: unknown[]) => void; fail: (...args: unknown[]) => void; console: (...args: unknown[]) => void } | null>(null);
   const runtimeErrorKeysRef = useRef(new Set<string>());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -46,6 +50,31 @@ const Preview: React.FC = () => {
   const [scale, setScale]               = useState(1);
   const [loadError, setLoadError]       = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keep at most one webview seek in flight. Playback can request a frame every
+  // animation tick; replacing a pending request with the newest frame prevents
+  // slow HTML/SVG pages from building a queue that makes Pause feel unresponsive.
+  flushSeekRef.current = () => {
+    if (seekInFlightRef.current) return;
+    const request = pendingSeekRef.current;
+    if (!request) return;
+    if (request.webview !== webviewRef.current
+      || request.generation !== loadGenerationRef.current
+      || !readyRef.current
+      || request.html !== readyHtmlRef.current) {
+      pendingSeekRef.current = null;
+      return;
+    }
+    pendingSeekRef.current = null;
+    seekInFlightRef.current = true;
+    void Promise.resolve()
+      .then(() => request.webview.executeJavaScript(request.code))
+      .catch(error => console.debug('[Preview] Seek skipped while webview is navigating', error))
+      .finally(() => {
+        seekInFlightRef.current = false;
+        flushSeekRef.current();
+      });
+  };
 
   // Imported music is intentionally outside the webview (the HTML's own audio
   // is muted for deterministic frame seeking). Decode it here and schedule it
@@ -161,7 +190,12 @@ const Preview: React.FC = () => {
   // 1. Freeze rAF so the page animation loop doesn't fight seek control
   var _frozen = true; // page's own playback loop must never run; the editor drives seek()
   var _origRAF = window.requestAnimationFrame.bind(window);
-  window.requestAnimationFrame = function(cb) { return _frozen ? 0 : _origRAF(cb); };
+  var _pendingRAF = [];
+  window.requestAnimationFrame = function(cb) {
+    if (!_frozen) return _origRAF(cb);
+    if (_pendingRAF.indexOf(cb) < 0) _pendingRAF.push(cb);
+    return 0;
+  };
   window.cancelAnimationFrame = function() {};
   window.__h2v_freeze = function() { _frozen = true; };
   window.__h2v_thaw   = function() { _frozen = false; };
@@ -177,13 +211,37 @@ const Preview: React.FC = () => {
   }
   Math.random = mulberry32(1337);
 
-  // 3. Silence page AudioContext
+  // 3. Route page Web Audio through a controllable master gain. Source audio
+  // stays muted by default; the Audio panel can enable it for preview.
+  window.__h2vSourceAudioMuted = true;
+  window.__h2vAudioContexts = [];
+  window.__h2vSetSourceAudioMuted = function(muted) {
+    window.__h2vSourceAudioMuted = !!muted;
+    (window.__h2vAudioContexts || []).forEach(function(ctx) {
+      if (ctx.__h2vSetMuted) ctx.__h2vSetMuted(!!muted);
+      if (!muted && ctx.state === 'suspended') ctx.resume().catch(function(){});
+    });
+    document.querySelectorAll('audio,video').forEach(function(el) { el.muted = !!muted; });
+  };
+  document.addEventListener('play', function(event) {
+    if (event.target instanceof HTMLMediaElement) event.target.muted = window.__h2vSourceAudioMuted;
+  }, true);
   var _AC = window.AudioContext || window.webkitAudioContext;
   if (_AC) {
     var _Orig = _AC;
+    var _connect = AudioNode.prototype.connect;
+    AudioNode.prototype.connect = function(dest) {
+      if (dest === this.context.destination && this.context.__h2vMaster) dest = this.context.__h2vMaster;
+      return _connect.apply(this, arguments);
+    };
     window.AudioContext = window.webkitAudioContext = function(o) {
       var ctx = new _Orig(o);
-      ctx.suspend().catch(function(){});
+      var master = ctx.createGain();
+      master.gain.value = window.__h2vSourceAudioMuted ? 0 : 1;
+      _connect.call(master, ctx.destination);
+      ctx.__h2vMaster = master;
+      ctx.__h2vSetMuted = function(muted) { master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.015); };
+      window.__h2vAudioContexts.push(ctx);
       return ctx;
     };
   }
@@ -198,8 +256,26 @@ const Preview: React.FC = () => {
   // editor playback. The editor still sets currentTime on every seek, so they
   // stay synchronized with the playhead instead of free-running independently.
   window.__h2v_setPlayback = function(playing) {
+    // Pages without a seek(ms) function need their own animation loop for
+    // playback (for example canvas animations driven by requestAnimationFrame).
+    // Keep that loop frozen while paused, and leave seek-controlled pages under
+    // the editor's deterministic frame-by-frame timeline.
+    var hasPageSeek = typeof window.seek === 'function';
+    try { if (typeof seek === 'function') hasPageSeek = true; } catch (e) {}
+    _frozen = hasPageSeek || !playing;
+    if (!_frozen && _pendingRAF.length) {
+      var pending = _pendingRAF.splice(0);
+      for (var i = 0; i < pending.length; i++) _origRAF(pending[i]);
+    }
     st.textContent = '*, *::before, *::after { transition: none !important;' +
       (playing ? '' : ' animation-play-state: paused !important;') + ' }';
+  };
+  window.__h2v_captureSourcePlayback = function() {
+    _frozen = false;
+    if (_pendingRAF.length) {
+      var pending = _pendingRAF.splice(0);
+      for (var i = 0; i < pending.length; i++) _origRAF(pending[i]);
+    }
   };
 
   // 5. Override engine lives in fxRuntime (shared with the export) — seek() = page seek + overrides
@@ -212,13 +288,39 @@ const Preview: React.FC = () => {
 <\/script>`;
 
     const captureCSS = `<style id="__h2v_ui">
-  #ctl, #controls, .controls, [id*="control"] { display: none !important; }
+  #ctl, #controls, .controls, [id*="control"], #bar:has(button):has(input[type="range"]) { display: none !important; }
   body { overflow: hidden !important; margin: 0 !important; background: transparent; }
   html { overflow: hidden !important; }
 </style>`;
 
+    // Audio extraction bridge: prefer a source-defined exporter. Otherwise
+    // trigger a source WAV/audio-export button so its own encoder can create
+    // the file (common in generated animation HTML).
+    const audioExportBridge = `<script>
+(function(){
+  window.__h2vExportSourceAudio = async function(){
+    if (window.__h2v_captureSourcePlayback) window.__h2v_captureSourcePlayback();
+    await Promise.all((window.__h2vAudioContexts || []).map(function(ctx){ return ctx.resume().catch(function(){}); }));
+    if (typeof window.__H2VID_EXPORT_AUDIO__ === 'function') {
+      var out = await window.__H2VID_EXPORT_AUDIO__();
+      var blob = out instanceof Blob ? out : new Blob([out], {type:'audio/wav'});
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'animation-audio.wav'; a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);}, 60000);
+      setTimeout(function(){ if(window.__h2v_setPlayback) window.__h2v_setPlayback(false); }, ${Math.min(project.source.duration || 30000, 3600000) + 1500});
+      return 'started';
+    }
+    var buttons = Array.from(document.querySelectorAll('button, a, input[type=button], input[type=submit]'));
+    var target = buttons.find(function(el){ return /(?:export|download|save).*(?:wav|audio)|(?:wav|audio).*(?:export|download|save)|\bwav\b/i.test((el.innerText||el.value||el.getAttribute('aria-label')||'')); });
+    if (!target) return 'unsupported';
+    target.click();
+    setTimeout(function(){ if(window.__h2v_setPlayback) window.__h2v_setPlayback(false); }, ${Math.min(project.source.duration || 30000, 3600000) + 1500});
+    return 'started';
+  };
+})();
+<\/script>`;
+
     // Insert neutralizer right after <head> opens, CSS before </head>
-    html = html.replace(/(<head[^>]*>)/i, (m: string) => `${m}\n${neutralizerScript}\n`); // function form: the script contains '$' characters
+    html = html.replace(/(<head[^>]*>)/i, (m: string) => `${m}\n${neutralizerScript}\n${audioExportBridge}\n`); // function form: the script contains '$' characters
     if (html.includes('</head>')) {
       html = html.replace('</head>', () => `${captureCSS}\n</head>`);
     } else {
@@ -234,6 +336,7 @@ const Preview: React.FC = () => {
     if (!wv || !project.source.htmlContent) return;
 
     const generation = ++loadGenerationRef.current;
+    pendingSeekRef.current = null;
     readyRef.current = false;
     readyHtmlRef.current = null;
     runtimeErrorKeysRef.current.clear();
@@ -344,8 +447,13 @@ const Preview: React.FC = () => {
       if(window.__h2v){window.__h2v.seek(t,o);}
       else if(typeof seek==='function'){seek(t);}
     })();`;
-    try { void wv.executeJavaScript(code).catch(() => {}); }
-    catch (error) { console.debug('[Preview] Seek skipped while webview is navigating', error); }
+    pendingSeekRef.current = {
+      webview: wv,
+      code,
+      generation: loadGenerationRef.current,
+      html: project.source.htmlContent
+    };
+    flushSeekRef.current();
   }, [project]);
 
   // ── Public seek ────────────────────────────────────────────────────────────
@@ -390,10 +498,11 @@ const Preview: React.FC = () => {
     }
 
     if (isPlaying) {
+      const generation = ++playbackGenerationRef.current;
       pbRef.current = { playing: true, startTime: performance.now(), baseMs: currentTimeMs };
 
       const loop = (now: number) => {
-        if (!pbRef.current.playing) return;
+        if (generation !== playbackGenerationRef.current || !pbRef.current.playing) return;
         const ms  = pbRef.current.baseMs + (now - pbRef.current.startTime);
         const dur = project.source.duration || 30000;
 
@@ -418,6 +527,7 @@ const Preview: React.FC = () => {
     }
 
     return () => {
+      playbackGenerationRef.current++;
       pbRef.current.playing = false;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
@@ -438,6 +548,30 @@ const Preview: React.FC = () => {
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, [project.source.stage]);
+
+  useEffect(() => {
+    const setMuted = (event: Event) => {
+      const muted = !!(event as CustomEvent<{ muted: boolean }>).detail?.muted;
+      const wv = webviewRef.current;
+      if (!wv || !readyRef.current) return;
+      void wv.executeJavaScript(`window.__h2vSetSourceAudioMuted && window.__h2vSetSourceAudioMuted(${muted});`).catch(() => {});
+    };
+    const exportAudio = async () => {
+      const wv = webviewRef.current;
+      let result = 'not-ready';
+      if (wv && readyRef.current) {
+        try { result = String(await wv.executeJavaScript(`window.__h2vExportSourceAudio ? window.__h2vExportSourceAudio() : 'unsupported'`)); }
+        catch { result = 'failed'; }
+      }
+      window.dispatchEvent(new CustomEvent('h2v:source-audio-export-result', { detail: { result } }));
+    };
+    window.addEventListener('h2v:source-audio-mute', setMuted);
+    window.addEventListener('h2v:export-source-audio', exportAudio);
+    return () => {
+      window.removeEventListener('h2v:source-audio-mute', setMuted);
+      window.removeEventListener('h2v:export-source-audio', exportAudio);
+    };
+  }, []);
 
   // ── Keyboard: Space = play/pause ───────────────────────────────────────────
   useEffect(() => {

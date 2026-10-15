@@ -108,6 +108,7 @@ export interface AppState {
   addAudioAsset: (asset: AudioAsset) => void;
   removeAudioAsset: (id: string) => void;
   updateAudio: (id: string, changes: Partial<AudioClip>) => void;
+  updateAudios: (updates: Array<{ id: string; changes: Partial<AudioClip> }>) => void;
   removeAudio: (id: string) => void;
   splitAudio: (id: string, atMs: number, sourceDuration?: number) => string | null;
 
@@ -194,6 +195,7 @@ export const useProjectStore = create<AppState>()(
         const idx = state.project.scenes.findIndex(s => s.id === id);
         if (idx >= 0) {
           Object.assign(state.project.scenes[idx], changes);
+          syncDuration(state.project);
           state.isModified = true;
         }
       }),
@@ -271,6 +273,17 @@ export const useProjectStore = create<AppState>()(
           Object.assign(state.project.audio[idx], changes);
           state.isModified = true;
         }
+      }),
+
+      updateAudios: (updates) => set((state) => {
+        let changed = false;
+        for (const update of updates) {
+          const clip = state.project.audio.find(item => item.id === update.id);
+          if (!clip) continue;
+          Object.assign(clip, update.changes);
+          changed = true;
+        }
+        if (changed) state.isModified = true;
       }),
 
       removeAudio: (id) => set((state) => {

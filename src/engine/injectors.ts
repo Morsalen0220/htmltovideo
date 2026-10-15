@@ -220,7 +220,7 @@ export const NEUTRALIZE_SCRIPT = `
 export const CAPTURE_CSS = `
   body { margin: 0 !important; padding: 0 !important; overflow: hidden !important; }
   #wrap { position: fixed !important; top: 0 !important; left: 0 !important; margin: 0 !important; }
-  #ctl { display: none !important; }
+  #ctl, #controls, .controls, [id*="control"], #bar:has(button):has(input[type="range"]) { display: none !important; }
 `;
 
 /**

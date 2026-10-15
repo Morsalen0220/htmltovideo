@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeFile: (filePath: string, content: string) =>
     ipcRenderer.invoke('fs:writeFile', filePath, content),
 
+  shareProject: (project: unknown) => ipcRenderer.invoke('project:share', project),
+
   readFileBinary: (filePath: string) =>
     ipcRenderer.invoke('fs:readFileBinary', filePath),
   
@@ -30,6 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   listDir: (dirPath: string) =>
     ipcRenderer.invoke('fs:listDir', dirPath),
+
+  listAudioDownloads: () => ipcRenderer.invoke('browser:listAudioDownloads'),
 
   // System info
   getCpuCount: () => ipcRenderer.invoke('system:cpuCount'),
@@ -54,9 +58,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Events from main process
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     const allowedChannels = [
-      'menu:import', 'menu:save', 'menu:open', 'menu:export',
+      'menu:import', 'menu:save', 'menu:open', 'menu:share', 'menu:export',
       'menu:undo', 'menu:redo', 'menu:duplicate', 'menu:delete',
-      'render:progress', 'render:complete', 'render:error'
+      'render:progress', 'render:complete', 'render:error', 'browser:download-complete',
+      'html-audio:download-complete'
     ];
     if (allowedChannels.includes(channel)) {
       const subscription = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => callback(...args);

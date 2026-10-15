@@ -144,10 +144,16 @@ const App: React.FC = () => {
       const loadedProject = JSON.parse(fileResult.content);
       
       // Load the HTML content from the source file
-      const htmlResult = await window.electronAPI.readFile(loadedProject.source.file);
+      const projectDir = projectPath.replace(/[\\/][^\\/]*$/, '');
+      const resolveProjectFile = (file: string) => /^[a-zA-Z]:[\\/]|^\\\\|^\//.test(file) ? file : `${projectDir}/${file}`;
+      const sourceFile = resolveProjectFile(loadedProject.source.file);
+      const htmlResult = await window.electronAPI.readFile(sourceFile);
       if (htmlResult.success && htmlResult.content) {
+        loadedProject.source.file = sourceFile;
         loadedProject.source.htmlContent = htmlResult.content;
       }
+      for (const clip of loadedProject.audio || []) clip.file = resolveProjectFile(clip.file);
+      for (const asset of loadedProject.audioAssets || []) asset.file = resolveProjectFile(asset.file);
       
       setProject(loadedProject);
       setProjectFilePath(projectPath);
@@ -161,6 +167,17 @@ const App: React.FC = () => {
     }
   }, [setProject, setProjectFilePath, setLoading, markSaved]);
 
+  const shareProject = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.shareProject(project);
+      if (result.canceled) return;
+      if (!result.success) throw new Error(result.error || 'Could not create the share archive.');
+      alert(`Project share ZIP saved to:\n${result.filePath}`);
+    } catch (error) {
+      alert(`Project share failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [project]);
+
   // Setup keyboard shortcuts and menu event listeners
   useEffect(() => {
     if (!window.electronAPI) return;
@@ -169,6 +186,7 @@ const App: React.FC = () => {
       window.electronAPI.on('menu:import', () => importHtml()),
       window.electronAPI.on('menu:save', () => saveProject()),
       window.electronAPI.on('menu:open', () => openProject()),
+      window.electronAPI.on('menu:share', () => shareProject()),
       window.electronAPI.on('menu:undo', () => undoProject()),
       window.electronAPI.on('menu:redo', () => redoProject()),
       window.electronAPI.on('menu:duplicate', () => useProjectStore.getState().duplicateSelection()),
@@ -176,7 +194,7 @@ const App: React.FC = () => {
     ];
     
     return () => unsubs.forEach(fn => fn?.());
-  }, [importHtml, saveProject, openProject, undoProject, redoProject]);
+  }, [importHtml, saveProject, openProject, shareProject, undoProject, redoProject]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -188,6 +206,18 @@ const App: React.FC = () => {
         return;
       }
       if (e.ctrlKey || e.metaKey) {
+        const key = e.key.toLowerCase();
+        if (!e.altKey && key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) redoProject();
+          else undoProject();
+          return;
+        }
+        if (!e.altKey && key === 'y') {
+          e.preventDefault();
+          redoProject();
+          return;
+        }
         if (e.key === 'o' && !e.shiftKey) { e.preventDefault(); importHtml(); }
         if (e.key === 's') { e.preventDefault(); saveProject(); }
         if (e.key === 'O' && e.shiftKey) { e.preventDefault(); openProject(); }

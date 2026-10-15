@@ -204,7 +204,7 @@ export interface AudioClip {
   trackIndex?: number; // zero-based audio track assignment
   trimIn: number;    // ms - trim from start of audio file
   trimOut: number;   // ms - trim from end (0 = no trim)
-  volume: number;    // 0-1
+  volume: number;    // 0-3 (0-300%)
   fadeIn: number;    // ms
   fadeOut: number;   // ms
 }

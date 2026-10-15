@@ -6,11 +6,13 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   showSaveDialog: (options) => electron.ipcRenderer.invoke("fs:showSaveDialog", options),
   readFile: (filePath) => electron.ipcRenderer.invoke("fs:readFile", filePath),
   writeFile: (filePath, content) => electron.ipcRenderer.invoke("fs:writeFile", filePath, content),
+  shareProject: (project) => electron.ipcRenderer.invoke("project:share", project),
   readFileBinary: (filePath) => electron.ipcRenderer.invoke("fs:readFileBinary", filePath),
   fileExists: (filePath) => electron.ipcRenderer.invoke("fs:exists", filePath),
   mkdir: (dirPath) => electron.ipcRenderer.invoke("fs:mkdir", dirPath),
   deleteDir: (dirPath) => electron.ipcRenderer.invoke("fs:deleteDir", dirPath),
   listDir: (dirPath) => electron.ipcRenderer.invoke("fs:listDir", dirPath),
+  listAudioDownloads: () => electron.ipcRenderer.invoke("browser:listAudioDownloads"),
   // System info
   getCpuCount: () => electron.ipcRenderer.invoke("system:cpuCount"),
   getFreeMemory: () => electron.ipcRenderer.invoke("system:freeMemory"),
@@ -33,6 +35,7 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
       "menu:import",
       "menu:save",
       "menu:open",
+      "menu:share",
       "menu:export",
       "menu:undo",
       "menu:redo",
@@ -40,7 +43,9 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
       "menu:delete",
       "render:progress",
       "render:complete",
-      "render:error"
+      "render:error",
+      "browser:download-complete",
+      "html-audio:download-complete"
     ];
     if (allowedChannels.includes(channel)) {
       const subscription = (_event, ...args) => callback(...args);

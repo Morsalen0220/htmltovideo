@@ -11,6 +11,10 @@ type IssueKind = 'warning' | 'error';
 
 function getIssueHelp(message: string) {
   const lower = message.toLowerCase();
+  if (lower.includes('source playback controls')) return {
+    impact: 'The imported page’s own play, pause, or seek controls are not connected to H2VID’s timeline. The source control bar is hidden in preview and export.',
+    fix: 'Use the Play/Pause and seek controls in H2VID. No source edit is needed.'
+  };
   if (lower.includes('cannot set properties of null') && lower.includes('setting')) return {
     impact: 'The HTML script tried to update a control that does not exist. The failing seek/render function may stop before updating the rest of that frame.',
     fix: 'Add the expected element with the correct id before seek() runs, or guard the write: const el=document.getElementById("control-id"); if(el) el.value=value;.'
@@ -68,8 +72,8 @@ function getIssueHelp(message: string) {
     fix: 'Use non-negative numeric seconds and make each end greater than its start in the SC array.'
   };
   if (lower.includes('no editable text')) return {
-    impact: 'The HTML may preview, but no text/timed elements will appear in the layer tree for editing.',
-    fix: 'Add data-s="startSeconds" to timed text, or use supported headings and paragraphs. Artwork-only SVG can remain non-editable.'
+    impact: 'Preview and render work; only the editable Layers list is empty.',
+    fix: 'For editable text, use <h1>, <h2>, <h3>, or <p> inside a scene. Timed example: <p data-s="1.2" data-d="2">Hello</p>. Canvas/SVG artwork stays preview-only. No changes are needed if preview/render is enough.'
   };
   if (lower.includes('stage dimensions')) return {
     impact: 'The preview defaults to 1280x720 and may scale or crop the source incorrectly.',
@@ -78,6 +82,10 @@ function getIssueHelp(message: string) {
   if (lower.includes('own audio')) return {
     impact: 'Page audio is muted in preview and export.',
     fix: 'Import the music separately from the Audio panel.'
+  };
+  if (lower.includes('external assets')) return {
+    impact: 'Linked scripts, images, styles, or media may not load without internet.',
+    fix: 'Keep internet connected, or download the linked assets and update the HTML to use local file paths.'
   };
   if (lower.includes('underscore') && lower.includes('font')) return {
     impact: 'A Google Font may fail to load.',
@@ -108,7 +116,7 @@ const ImportReportModal: React.FC<ImportReportModalProps> = ({ report, onClose }
       issues.length ? 'Issues and suggested fixes:' : 'Issues: none',
       ...issues.flatMap(({ message, kind }) => {
         const help = getIssueHelp(message);
-        return [`[${kind.toUpperCase()}] ${message}`, `Impact: ${help.impact}`, `Fix: ${help.fix}`, ''];
+        return [`[${kind.toUpperCase()}] ${message}`, `What this means: ${help.impact}`, `What to do: ${help.fix}`, ''];
       }),
       `Detected duration declaration: ${report.rawD || '(not detected)'}`,
       'Detected SC array:',
@@ -176,7 +184,7 @@ const ImportReportModal: React.FC<ImportReportModalProps> = ({ report, onClose }
 
           {issues.length > 0 && (
             <div className="report-section">
-              <h3>Import issues &amp; how to fix them</h3>
+          <h3>Import notes &amp; next steps</h3>
               <div className="report-issues">
                 {issues.map(({ message, kind }, i) => {
                   const help = getIssueHelp(message);
@@ -187,7 +195,7 @@ const ImportReportModal: React.FC<ImportReportModalProps> = ({ report, onClose }
                         <span>{message}</span>
                       </div>
                       <p><strong>What this means:</strong> {help.impact}</p>
-                      <p><strong>How to fix:</strong> {help.fix}</p>
+                      <p><strong>What to do:</strong> {help.fix}</p>
                     </article>
                   );
                 })}

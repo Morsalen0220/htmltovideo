@@ -6,6 +6,7 @@ import Properties from '../components/Properties/Properties';
 import Timeline from '../components/Timeline/Timeline';
 import ExportDialog from '../components/Export/ExportDialog';
 import ImportReportModal from '../components/ImportReportModal';
+import BrowserPanel from '../components/BrowserPanel/BrowserPanel';
 import { useClipboardShortcuts } from './useClipboardShortcuts';
 import './Layout.css';
 
@@ -21,6 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ onImportHtml, onSaveProject, onOpenProj
   const [leftWidth, setLeftWidth] = useState(220);
   const [rightWidth, setRightWidth] = useState(280);
   const [timelineHeight, setTimelineHeight] = useState(200);
+  const [showBrowser, setShowBrowser] = useState(false);
   const hasProject = !!project.source.file;
   useClipboardShortcuts();
 
@@ -42,6 +44,9 @@ const Layout: React.FC<LayoutProps> = ({ onImportHtml, onSaveProject, onOpenProj
         </div>
         
         <div className="toolbar-right">
+          <button className={`btn ${showBrowser ? 'btn-primary' : ''}`} onClick={() => setShowBrowser(open => !open)} title="Show or hide browser">
+            Browser
+          </button>
           <button className="btn" onClick={onOpenProject} title="Open Project (Ctrl+Shift+O)">
             📂 Open
           </button>
@@ -116,6 +121,7 @@ const Layout: React.FC<LayoutProps> = ({ onImportHtml, onSaveProject, onOpenProj
         <div className="panel panel-right" style={{ width: rightWidth }}>
           <Properties />
         </div>
+        {showBrowser && <BrowserPanel onClose={() => setShowBrowser(false)} />}
       </div>
 
       {/* Export dialog */}

@@ -26,6 +26,11 @@ interface DragState {
   trimIn?: number;
   trimOut?: number;
   sourceDuration?: number;
+  rollClipId?: string;
+  rollStart?: number;
+  rollTrimIn?: number;
+  rollTrimOut?: number;
+  rollSourceDuration?: number;
 }
 
 const Timeline: React.FC = () => {
@@ -45,7 +50,8 @@ const Timeline: React.FC = () => {
     selectAudio,
     addAudio,
     updateScene,
-    updateAudio
+    updateAudio,
+    updateAudios
   } = useProjectStore();
 
   const [zoom, setZoom] = useState(1);
@@ -53,6 +59,8 @@ const Timeline: React.FC = () => {
   const [canvasWidth, setCanvasWidth] = useState(800);
   const [audioMeta, setAudioMeta] = useState<Record<string, AudioMeta>>({});
   const [timelineCursor, setTimelineCursor] = useState('default');
+  const scenesRef = useRef(project.scenes);
+  scenesRef.current = project.scenes;
 
   // Decode each imported file once so the timeline shows its true duration and waveform.
   const audioFilesKey = project.audio.map(clip => `${clip.id}:${clip.file}`).join('|');
@@ -69,7 +77,9 @@ const Timeline: React.FC = () => {
             const bytes = Uint8Array.from(atob(result.data), char => char.charCodeAt(0));
             const decoded = await context.decodeAudioData(bytes.buffer);
             const channel = decoded.getChannelData(0);
-            const count = Math.min(2400, Math.max(240, Math.ceil(decoded.duration * 12)));
+            // Keep enough detail for the waveform to follow fine left-edge trims
+            // without visibly jumping between coarse peak buckets.
+            const count = Math.min(18000, Math.max(240, Math.ceil(decoded.duration * 60)));
             const stride = Math.max(1, Math.floor(channel.length / count));
             const peaks = new Array(count);
             for (let i = 0; i < count; i++) {
@@ -248,14 +258,18 @@ const Timeline: React.FC = () => {
         const peaks = meta?.peaks;
         if (peaks?.length && clipW > 2) {
           const mid = top + clipH / 2;
-          const sourceStart = Math.floor((clip.trimIn / sourceDuration) * peaks.length);
-          const sourceEnd = Math.ceil(((sourceDuration - clip.trimOut) / sourceDuration) * peaks.length);
-          const visiblePeaks = Math.max(1, sourceEnd - sourceStart);
+          const maxWaveHeight = Math.max(1, clipH / 2 - 2);
           ctx.fillStyle = '#56d6b4';
           for (let x = 1; x < clipW; x += 2) {
-            const p = peaks[Math.min(sourceEnd - 1, sourceStart + Math.floor((x / clipW) * visiblePeaks))] || 0;
-            const bar = Math.max(1, p * (clipH * 0.72));
-            ctx.fillRect(clipX + x, mid - bar / 2, 1, bar);
+            // Map each timeline pixel to a fixed point in the source audio.
+            // This keeps existing waveform peaks anchored while trimming and
+            // reveals the newly exposed source section as the clip grows.
+            const sourceMs = clip.trimIn + (x / pxPerMs);
+            const sourceIndex = Math.min(peaks.length - 1, Math.floor((sourceMs / sourceDuration) * peaks.length));
+            const p = peaks[Math.max(0, sourceIndex)] || 0;
+            const bar = Math.max(1, p * maxWaveHeight);
+            // Draw a single-sided waveform above the center line.
+            ctx.fillRect(clipX + x, mid - bar, 1, bar);
           }
         } else {
           ctx.fillStyle = '#3b8f7d'; ctx.fillRect(clipX + 3, top + clipH / 2, Math.max(0, clipW - 6), 1);
@@ -332,8 +346,12 @@ const Timeline: React.FC = () => {
         const bx = msToX(scene.start);
         const bw = msToX(scene.end) - bx;
         if (x < bx || x > bx + bw) continue;
-        if (x - bx < 8) return { type: 'scene-resize-left', sceneId: scene.id, startX: x, startMs: scene.start, startEnd: scene.end };
-        if (bx + bw - x < 8) return { type: 'scene-resize-right', sceneId: scene.id, startX: x, startMs: scene.start, startEnd: scene.end };
+        const leftDistance = x - bx;
+        const rightDistance = bx + bw - x;
+        const nearLeft = leftDistance < 8;
+        const nearRight = rightDistance < 8;
+        if (nearLeft && (!nearRight || leftDistance <= rightDistance)) return { type: 'scene-resize-left', sceneId: scene.id, startX: x, startMs: scene.start, startEnd: scene.end };
+        if (nearRight) return { type: 'scene-resize-right', sceneId: scene.id, startX: x, startMs: scene.start, startEnd: scene.end };
         return { type: 'scene-move', sceneId: scene.id, startX: x, startMs: scene.start, startEnd: scene.end };
       }
     }
@@ -345,7 +363,10 @@ const Timeline: React.FC = () => {
       const sourceDuration = meta?.duration ?? clip.duration ?? Math.max(0, totalDuration - clip.start + clip.trimIn + clip.trimOut);
       const duration = Math.max(0, sourceDuration - clip.trimIn - clip.trimOut);
       const bx = msToX(clip.start), bw = msToX(clip.start + duration) - bx;
-      if (x < bx || x > bx + bw) return null;
+      // Clips are checked from topmost/newest to oldest. A miss on one clip
+      // must keep searching, otherwise a later split segment blocks clicks on
+      // the earlier segment that shares its track row.
+      if (x < bx || x > bx + bw) continue;
       if (x - bx < 7) return { type: 'audio-trim-left', audioId: clip.id, startX: x, startMs: clip.start, audioStart: clip.start, trimIn: clip.trimIn, trimOut: clip.trimOut, sourceDuration };
       if (bx + bw - x < 7) return { type: 'audio-trim-right', audioId: clip.id, startX: x, startMs: clip.start, audioStart: clip.start, trimIn: clip.trimIn, trimOut: clip.trimOut, sourceDuration };
       return { type: 'audio-move', audioId: clip.id, startX: x, startMs: clip.start, audioStart: clip.start, trimIn: clip.trimIn, trimOut: clip.trimOut, sourceDuration };
@@ -368,7 +389,35 @@ const Timeline: React.FC = () => {
       return;
     }
 
-    dragRef.current = hit;
+    const rollData: Partial<DragState> = {};
+    if ((hit.type === 'audio-trim-left' || hit.type === 'audio-trim-right') && hit.audioId) {
+      const clip = project.audio.find(item => item.id === hit.audioId);
+      if (clip) {
+        const getLength = (item: typeof clip) => {
+          const sourceDuration = audioMeta[item.id]?.duration ?? item.duration ??
+            Math.max(0, totalDuration - item.start + item.trimIn + item.trimOut);
+          return Math.max(0, sourceDuration - item.trimIn - item.trimOut);
+        };
+        const boundary = hit.type === 'audio-trim-left' ? clip.start : clip.start + getLength(clip);
+        const neighbor = project.audio
+          .filter(item => item.id !== clip.id && item.file === clip.file && (item.trackIndex ?? 0) === (clip.trackIndex ?? 0))
+          .map(item => ({
+            clip: item,
+            length: getLength(item),
+            sourceDuration: audioMeta[item.id]?.duration ?? item.duration ??
+              Math.max(0, totalDuration - item.start + item.trimIn + item.trimOut)
+          }))
+          .find(({ clip: item, length }) => Math.abs((hit.type === 'audio-trim-left' ? item.start + length : item.start) - boundary) <= 5);
+        if (neighbor) {
+          rollData.rollClipId = neighbor.clip.id;
+          rollData.rollStart = neighbor.clip.start;
+          rollData.rollTrimIn = neighbor.clip.trimIn;
+          rollData.rollTrimOut = neighbor.clip.trimOut;
+          rollData.rollSourceDuration = neighbor.sourceDuration;
+        }
+      }
+    }
+    dragRef.current = { ...hit, ...rollData };
 
     if (hit.type === 'playhead') {
       const ms = Math.max(0, Math.min(totalDuration, xToMs(x)));
@@ -380,7 +429,7 @@ const Timeline: React.FC = () => {
       selectAudio(hit.audioId);
     }
     e.preventDefault();
-  }, [getHitTarget, xToMs, setCurrentTime, setPlaying, isPlaying, totalDuration, selectScene, selectAudio]);
+  }, [getHitTarget, xToMs, setCurrentTime, setPlaying, isPlaying, totalDuration, selectScene, selectAudio, project.audio, audioMeta]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const drag = dragRef.current;
@@ -394,36 +443,152 @@ const Timeline: React.FC = () => {
       setCurrentTime(Math.round(Math.max(0, Math.min(totalDuration, xToMs(x)))));
     } else if (drag.type === 'scene-move' && drag.sceneId) {
       const dur = (drag.startEnd || 0) - drag.startMs;
-      const newStart = Math.max(0, drag.startMs + dms);
+      const proposedStart = Math.max(0, drag.startMs + dms);
+      const intervals = scenesRef.current
+        .filter(scene => scene.id !== drag.sceneId)
+        .map(scene => ({ start: scene.start, end: scene.end }))
+        .sort((a, b) => a.start - b.start);
+
+      // Scene blocks share one track row. Resolve the drag to the nearest
+      // available gap so moving a scene can never cover another scene.
+      let cursor = 0;
+      let newStart = proposedStart;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      const considerGap = (gapStart: number, gapEnd: number) => {
+        if (gapEnd - gapStart < dur) return;
+        const candidate = Math.max(gapStart, Math.min(proposedStart, gapEnd - dur));
+        const distance = Math.abs(candidate - proposedStart);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          newStart = candidate;
+        }
+      };
+      for (const interval of intervals) {
+        considerGap(cursor, interval.start);
+        cursor = Math.max(cursor, interval.end);
+      }
+      considerGap(cursor, Number.POSITIVE_INFINITY);
       updateScene(drag.sceneId, { start: Math.round(newStart), end: Math.round(newStart + dur) });
     } else if (drag.type === 'scene-resize-left' && drag.sceneId) {
-      const newStart = Math.max(0, drag.startMs + dms);
-      if (newStart < (drag.startEnd || 0) - 500) {
+      const previousEnd = Math.max(0, ...scenesRef.current
+        .filter(scene => scene.id !== drag.sceneId && scene.start < drag.startMs)
+        .map(scene => scene.end));
+      const latestStart = (drag.startEnd || 0) - 500;
+      const newStart = Math.min(latestStart, Math.max(previousEnd, drag.startMs + dms));
+      if (newStart >= previousEnd && newStart <= latestStart) {
         updateScene(drag.sceneId, { start: Math.round(newStart) });
       }
     } else if (drag.type === 'scene-resize-right' && drag.sceneId) {
-      const newEnd = Math.max(drag.startMs + 500, (drag.startEnd || 0) + dms);
-      updateScene(drag.sceneId, { end: Math.round(newEnd) });
+      const nextStart = Math.min(Number.POSITIVE_INFINITY, ...scenesRef.current
+        .filter(scene => scene.id !== drag.sceneId && scene.start >= (drag.startEnd || 0))
+        .map(scene => scene.start));
+      const earliestEnd = drag.startMs + 500;
+      const latestEnd = nextStart;
+      const newEnd = Math.max(earliestEnd, Math.min(latestEnd, (drag.startEnd || 0) + dms));
+      if (newEnd >= earliestEnd && newEnd <= latestEnd) {
+        updateScene(drag.sceneId, { end: Math.round(newEnd) });
+      }
     } else if (drag.audioId) {
       const delta = Math.round(dms);
+      const getAudioLength = (clip: typeof project.audio[number]) => {
+        const sourceDuration = audioMeta[clip.id]?.duration ?? clip.duration ??
+          Math.max(0, totalDuration - clip.start + clip.trimIn + clip.trimOut);
+        return Math.max(0, sourceDuration - clip.trimIn - clip.trimOut);
+      };
       if (drag.type === 'audio-move') {
-        updateAudio(drag.audioId, { start: Math.max(0, (drag.audioStart || 0) + delta) });
         const audioTop = RULER_HEIGHT + TRACK_HEIGHT;
         const targetIndex = Math.max(0, Math.floor((y - audioTop) / AUDIO_TRACK_HEIGHT));
-        updateAudio(drag.audioId, { trackIndex: targetIndex });
+        const movingClip = project.audio.find(clip => clip.id === drag.audioId);
+        if (movingClip) {
+          const getClipLength = (clip: typeof movingClip) => {
+            const sourceDuration = audioMeta[clip.id]?.duration ?? clip.duration ??
+              Math.max(0, totalDuration - clip.start + clip.trimIn + clip.trimOut);
+            return Math.max(0, sourceDuration - clip.trimIn - clip.trimOut);
+          };
+          const clipLength = getClipLength(movingClip);
+          const proposedStart = Math.max(0, (drag.audioStart || 0) + delta);
+          const intervals = project.audio
+            .filter(clip => clip.id !== movingClip.id && (clip.trackIndex ?? 0) === targetIndex)
+            .map(clip => ({ start: clip.start, end: clip.start + getClipLength(clip) }))
+            .sort((a, b) => a.start - b.start);
+
+          // Keep the clip in the nearest available gap on the target track.
+          // Touching clip boundaries is allowed; overlapping them is not.
+          let cursor = 0;
+          let resolvedStart = proposedStart;
+          let nearestDistance = Number.POSITIVE_INFINITY;
+          const considerGap = (gapStart: number, gapEnd: number) => {
+            if (gapEnd - gapStart < clipLength) return;
+            const candidate = Math.max(gapStart, Math.min(proposedStart, gapEnd - clipLength));
+            const distance = Math.abs(candidate - proposedStart);
+            if (distance < nearestDistance) {
+              nearestDistance = distance;
+              resolvedStart = candidate;
+            }
+          };
+
+          for (const interval of intervals) {
+            considerGap(cursor, interval.start);
+            cursor = Math.max(cursor, interval.end);
+          }
+          considerGap(cursor, Number.POSITIVE_INFINITY);
+          updateAudio(drag.audioId, { start: Math.round(resolvedStart), trackIndex: targetIndex });
+        }
       }
       if (drag.type === 'audio-trim-left') {
-        const trimDelta = Math.min((drag.sourceDuration || 0) - (drag.trimIn || 0) - (drag.trimOut || 0) - 100, delta);
-        const newStart = Math.max(0, (drag.audioStart || 0) + trimDelta);
+        const sourceDuration = drag.sourceDuration || 0;
+        const trimIn = drag.trimIn || 0;
+        const trimOut = drag.trimOut || 0;
+        const oldStart = drag.audioStart || 0;
+        if (drag.rollClipId !== undefined) {
+          const leftLength = (drag.rollSourceDuration || sourceDuration) - (drag.rollTrimIn || 0) - (drag.rollTrimOut || 0);
+          const rightLength = sourceDuration - trimIn - trimOut;
+          const shift = Math.max(100 - leftLength, Math.min(rightLength - 100, delta));
+          updateAudios([
+            { id: drag.rollClipId, changes: { trimOut: Math.max(0, (drag.rollTrimOut || 0) - shift) } },
+            { id: drag.audioId, changes: { start: oldStart + shift, trimIn: Math.max(0, trimIn + shift) } }
+          ]);
+          return;
+        }
+        const movingClip = project.audio.find(clip => clip.id === drag.audioId);
+        const previousEnd = movingClip ? Math.max(0, ...project.audio
+          .filter(clip => clip.id !== movingClip.id && (clip.trackIndex ?? 0) === (movingClip.trackIndex ?? 0) && clip.start + getAudioLength(clip) <= oldStart)
+          .map(clip => clip.start + getAudioLength(clip))) : 0;
+        const earliestStart = Math.max(0, previousEnd);
+        // Extend left only as far as the previous clip; shortening remains possible up to 100 ms.
+        const minDelta = Math.max(-trimIn, earliestStart - oldStart);
+        const maxDelta = sourceDuration - trimIn - trimOut - 100;
+        const trimDelta = Math.max(minDelta, Math.min(maxDelta, delta));
+        const newStart = oldStart + trimDelta;
         const actualDelta = newStart - (drag.audioStart || 0);
         updateAudio(drag.audioId, { start: newStart, trimIn: Math.max(0, (drag.trimIn || 0) + actualDelta) });
       }
       if (drag.type === 'audio-trim-right') {
-        const maxTrim = (drag.sourceDuration || 0) - (drag.trimIn || 0) - 100;
-        updateAudio(drag.audioId, { trimOut: Math.max(0, Math.min(maxTrim, (drag.trimOut || 0) - delta)) });
+        const sourceDuration = drag.sourceDuration || 0;
+        const trimIn = drag.trimIn || 0;
+        const trimOut = drag.trimOut || 0;
+        const movingClip = project.audio.find(clip => clip.id === drag.audioId);
+        const oldStart = drag.audioStart || 0;
+        if (drag.rollClipId !== undefined) {
+          const leftLength = sourceDuration - trimIn - trimOut;
+          const rightLength = (drag.rollSourceDuration || sourceDuration) - (drag.rollTrimIn || 0) - (drag.rollTrimOut || 0);
+          const shift = Math.max(100 - leftLength, Math.min(rightLength - 100, delta));
+          updateAudios([
+            { id: drag.audioId, changes: { trimOut: Math.max(0, trimOut - shift) } },
+            { id: drag.rollClipId, changes: { start: (drag.rollStart || 0) + shift, trimIn: Math.max(0, (drag.rollTrimIn || 0) + shift) } }
+          ]);
+          return;
+        }
+        const nextStart = movingClip ? Math.min(Number.POSITIVE_INFINITY, ...project.audio
+          .filter(clip => clip.id !== movingClip.id && (clip.trackIndex ?? 0) === (movingClip.trackIndex ?? 0) && clip.start >= oldStart)
+          .map(clip => clip.start)) : Number.POSITIVE_INFINITY;
+        const maxVisibleLength = nextStart - oldStart;
+        const minTrimOut = Math.max(0, sourceDuration - trimIn - maxVisibleLength);
+        const maxTrimOut = sourceDuration - trimIn - 100;
+        updateAudio(drag.audioId, { trimOut: Math.max(minTrimOut, Math.min(maxTrimOut, trimOut - delta)) });
       }
     }
-  }, [pxPerMs, xToMs, setCurrentTime, updateScene, updateAudio, totalDuration]);
+  }, [pxPerMs, xToMs, setCurrentTime, updateScene, updateAudio, updateAudios, totalDuration, project.audio, audioMeta]);
 
   const handleMouseUp = useCallback(() => { dragRef.current = null; }, []);
 

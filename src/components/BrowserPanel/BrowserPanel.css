@@ -1,0 +1,54 @@
+.browser-panel {
+  width: 360px;
+  min-width: 300px;
+  flex: 0 0 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+}
+
+.browser-panel-header,
+.browser-downloads-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0 10px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.browser-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.browser-address-form { flex: 1; min-width: 0; }
+.browser-address-form input { width: 100%; min-width: 0; box-sizing: border-box; }
+.browser-view { flex: 1; min-height: 140px; overflow: hidden; background: #fff; }
+.browser-view webview { display: inline-flex; }
+
+.browser-downloads {
+  max-height: 190px;
+  flex: 0 0 auto;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+
+.browser-downloads-title { min-height: 34px; }
+.browser-downloads .hint { padding: 0 10px; }
+.browser-download-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.browser-download-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.browser-error { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; color: var(--danger, #f87171); font-size: 12px; }
